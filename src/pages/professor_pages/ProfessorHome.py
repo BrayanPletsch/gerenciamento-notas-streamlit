@@ -39,13 +39,17 @@ def show_professor_home():
         with col1:
             if st.button("👥 Gerenciar Alunos", use_container_width=True):
                 st.session_state.current_page = "GerenciarAlunos"
+                st.rerun()
             if st.button("📚 Gerenciar Disciplinas", use_container_width=True):
                 st.session_state.current_page = "GerenciarDisciplinas"
+                st.rerun()
         with col2:
             if st.button("🏷️ Gerenciar Turmas", use_container_width=True):
                 st.session_state.current_page = "GerenciarTurmas"
+                st.rerun()
             if st.button("📝 Notas por Turma", use_container_width=True):
                 st.session_state.current_page = "NotasPorTurma"
+                st.rerun()
         st.write("---")
         st.caption("Sistema de Gerenciamento de Notas Escolares  •  Versão Acadêmica")
 
@@ -63,4 +67,3 @@ def show_professor_home():
         show_criar_cadastro_alunos()
     elif page == "InfoPage":
         show_info()
-        

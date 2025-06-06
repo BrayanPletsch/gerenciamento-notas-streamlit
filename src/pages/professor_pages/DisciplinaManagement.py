@@ -1,3 +1,4 @@
+import time
 import streamlit as st
 import pandas as pd
 import os
@@ -23,8 +24,18 @@ def show_disciplina_management():
 
     df = pd.read_csv(CSV_PATH, dtype=str, keep_default_na=False)
     df = df.astype(str).apply(lambda col: col.str.strip())
+
+    col1, col2 = st.columns([3,1])
+    
+    if "ProfessorHome" not in st.session_state:
+        st.session_state.current_page = "ProfessorHome"
+
+    with col2:
+        if st.button("🔙 Voltar"):
+            st.session_state.page = "ProfessorHome"
+    
     st.title("Gerenciar Disciplinas")
-    st.subheader("Lista de Disciplinas")
+    st.subheader("📚 Lista de Disciplinas")
     st.dataframe(df)
 
     with st.expander("Adicionar Disciplina"):
@@ -55,11 +66,16 @@ def show_disciplina_management():
         with st.form(key="remove_disciplina", clear_on_submit=True):
             options   = df["codigo"] + " - " + df["nome_disciplina"]
             to_remove = st.selectbox("Selecione a disciplina", options)
+            confirm_removal = st.selectbox("Tem certeza que deseja remover esta disciplina?", ["Não", "Sim"])
             if st.form_submit_button("Remover"):
-                cod = to_remove.split(" - ")[0]
-                df_atual = pd.read_csv(CSV_PATH, dtype=str, keep_default_na=False)
-                df_atual = df_atual.astype(str).apply(lambda col: col.str.strip())
-                df2 = df_atual[df_atual["codigo"] != cod]
-                df2.to_csv(CSV_PATH, index=False)
-                st.success("Disciplina removida com sucesso")
-                st.rerun()
+                if confirm_removal == "Sim":
+                    cod = to_remove.split(" - ")[0]
+                    df_atual = pd.read_csv(CSV_PATH, dtype=str, keep_default_na=False)
+                    df_atual = df_atual.astype(str).apply(lambda col: col.str.strip())
+                    df2 = df_atual[df_atual["codigo"] != cod]
+                    df2.to_csv(CSV_PATH, index=False)
+                    st.success("Disciplina removida com sucesso")
+                    time.sleep(2)
+                    st.rerun()
+                else:
+                    st.info("Ação de remoção cancelada.")
