@@ -7,22 +7,28 @@ from src.pages.InfoPage import show_info
 from src.utils.Auth import logout
 
 
-DATA_DIR = Path('data')
-USERS_CSV = DATA_DIR / 'users.csv'
-ALUNOS_CSV = DATA_DIR / 'alunos.csv'
-NOTAS_CSV = DATA_DIR / 'notas.csv'
+DATA_DIR = Path("data")
+USERS_CSV = DATA_DIR / "users.csv"
+ALUNOS_CSV = DATA_DIR / "alunos.csv"
+NOTAS_CSV = DATA_DIR / "notas.csv"
+DISCIPLINAS_CSV = DATA_DIR / "disciplinas.csv"
 
-USERS_HEADER = ['id','username','password','user_type','name']
-ALUNOS_HEADER = ['user_id','matricula','nome','turma']
-NOTAS_HEADER = ['id','user_id','nome','matricula','codigo','nome_disciplina','nota']
+USERS_HEADER = ["id","username","password","user_type","name"]
+ALUNOS_HEADER = ["user_id","matricula","nome","turma"]
+NOTAS_HEADER = ["id","matricula","codigo","nota"]
+DISCIPLINAS_HEADER = ["codigo","nome_disciplina"]
+
+
+def ensure_csv(path: Path, header: list):
+    DATA_DIR.mkdir(exist_ok=True)
+    if not path.exists() or path.stat().st_size == 0:
+        pd.DataFrame(columns=header).to_csv(path, index=False)
 
 
 def load_df(path: Path, header: list) -> pd.DataFrame:
-    path.parent.mkdir(exist_ok=True)
-    if not path.exists() or path.stat().st_size == 0:
-        return pd.DataFrame(columns=header)
+    ensure_csv(path, header)
     df = pd.read_csv(path, dtype=str, keep_default_na=False)
-    return df.map(lambda x: x.strip())
+    return df.apply(lambda col: col.str.strip())
 
 
 def show_aluno_home():
@@ -43,25 +49,25 @@ def show_aluno_home():
     if st.session_state.current_page == 'AlunoHome':
         users = load_df(USERS_CSV, USERS_HEADER)
         alunos = load_df(ALUNOS_CSV, ALUNOS_HEADER)
-        notas  = load_df(NOTAS_CSV, NOTAS_HEADER)
+        notas = load_df(NOTAS_CSV, NOTAS_HEADER)
+        disciplinas = load_df(DISCIPLINAS_CSV, DISCIPLINAS_HEADER)
 
         username = st.session_state.current_user
-        user = users[users.name == username]
-        if user.empty:
+        user_row = users[users.name == username]
+        if user_row.empty:
             st.error('Usuário não encontrado.')
             return
 
-        user_id = user.iloc[0]['id']
-        full_name = user.iloc[0]['name']
+        user_id   = user_row.iloc[0]['id']
+        full_name = user_row.iloc[0]['name']
 
         st.title('Área do Aluno')
         st.write(f"Olá, **{full_name}**!")
         st.write('---')
 
-        aluno = alunos[alunos.matricula == user_id]
-        if not aluno.empty:
-            turma = aluno.iloc[0]['turma']
-            st.subheader(f"Turma: {turma}")
+        aluno_row = alunos[alunos.matricula == user_id]
+        if not aluno_row.empty:
+            st.subheader(f"Turma: {aluno_row.iloc[0]['turma']}")
         else:
             st.info('Dados de matrícula não encontrados.')
 
@@ -70,7 +76,8 @@ def show_aluno_home():
 
         minhas = notas[notas.matricula == user_id]
         if not minhas.empty:
-            df = minhas[['nome_disciplina','nota']].rename(
+            df = minhas.merge(disciplinas, on='codigo', how='left')
+            df = df[['nome_disciplina','nota']].rename(
                 columns={'nome_disciplina':'Disciplina','nota':'Nota'}
             )
             st.dataframe(df, use_container_width=True)
@@ -78,7 +85,6 @@ def show_aluno_home():
             st.info('Nenhuma nota registrada.')
 
         st.write('---')
-        st.caption('Sistema de Gerenciamento de Notas Escolares  •  Versão Acadêmica')
-
+        st.caption('Sistema de Gerenciamento de Notas Escolares • Versão Acadêmica')
     elif st.session_state.current_page == 'InfoPage':
         show_info()
