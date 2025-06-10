@@ -1,4 +1,5 @@
 import streamlit as st
+
 from src.pages.professor_pages.AlunoManagement import show_aluno_management
 from src.pages.professor_pages.DisciplinaManagement import show_disciplina_management
 from src.pages.professor_pages.TurmaManagement import show_turma_management
@@ -7,6 +8,7 @@ from src.pages.professor_pages.CriarCadastroAlunos import show_criar_cadastro_al
 from src.pages.professor_pages.PerfilProfessor import show_meu_perfil
 from src.pages.InfoPage import show_info
 from src.utils.Auth import logout
+
 
 def show_professor_home():
     if "current_page" not in st.session_state:
