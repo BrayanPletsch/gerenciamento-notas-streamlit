@@ -143,7 +143,7 @@ Cada página do Streamlit (`src/pages/...`) carrega e valida o CSV correspondent
 * João Vitor de Freitas Silva
 * Pedro Freire de Farias
 
-### Licença
+<h2 align="center">Licença</h2>
 
 Este projeto está licenciado sob a [MIT License](LICENSE).
 
