@@ -43,4 +43,3 @@ def show_info():
     st.markdown(
     "<p style='text-align: center; color: gray;'>© 2025 Engenharia de Software N1 – Estrutura de Dados I • Licença MIT</p>",
     unsafe_allow_html=True)
-

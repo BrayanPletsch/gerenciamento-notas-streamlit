@@ -1,70 +1,84 @@
-import streamlit as st
+from pathlib import Path
+
 import pandas as pd
-import os
+import streamlit as st
 
 from src.pages.InfoPage import show_info
 from src.utils.Auth import logout
 
-ALUNOS_CSV = os.path.join("data", "alunos.csv")
-NOTAS_CSV = os.path.join("data", "notas.csv")
-DISCIPLINAS_CSV = os.path.join("data", "disciplinas.csv")
+
+DATA_DIR = Path('data')
+USERS_CSV = DATA_DIR / 'users.csv'
+ALUNOS_CSV = DATA_DIR / 'alunos.csv'
+NOTAS_CSV = DATA_DIR / 'notas.csv'
+
+USERS_HEADER = ['id','username','password','user_type','name']
+ALUNOS_HEADER = ['user_id','matricula','nome','turma']
+NOTAS_HEADER = ['id','user_id','nome','matricula','codigo','nome_disciplina','nota']
+
+
+def load_df(path: Path, header: list) -> pd.DataFrame:
+    path.parent.mkdir(exist_ok=True)
+    if not path.exists() or path.stat().st_size == 0:
+        return pd.DataFrame(columns=header)
+    df = pd.read_csv(path, dtype=str, keep_default_na=False)
+    return df.map(lambda x: x.strip())
+
 
 def show_aluno_home():
-    if "current_page" not in st.session_state:
-        st.session_state.current_page = "AlunoHome"
-
-    st.set_page_config(page_title="Área do Aluno", page_icon="🎓", layout="wide")
+    st.set_page_config(page_title='Área do Aluno', page_icon='🎓', layout='wide')
+    if 'current_page' not in st.session_state:
+        st.session_state.current_page = 'AlunoHome'
 
     st.sidebar.title(f"Bem-vindo, {st.session_state.current_user}!")
     st.sidebar.divider()
-    
-    if st.sidebar.button("Home", use_container_width=True):
-        st.session_state.current_page = "AlunoHome"
-    if st.sidebar.button("Informações do Projeto", use_container_width=True):
-        st.session_state.current_page = "InfoPage"
+    if st.sidebar.button('Home', use_container_width=True):
+        st.session_state.current_page = 'AlunoHome'
+    if st.sidebar.button('Informações do Projeto', use_container_width=True):
+        st.session_state.current_page = 'InfoPage'
     st.sidebar.divider()
-    if st.sidebar.button("Sair", use_container_width=True):
+    if st.sidebar.button('Sair', use_container_width=True):
         logout()
 
-    page = st.session_state.current_page
+    if st.session_state.current_page == 'AlunoHome':
+        users = load_df(USERS_CSV, USERS_HEADER)
+        alunos = load_df(ALUNOS_CSV, ALUNOS_HEADER)
+        notas  = load_df(NOTAS_CSV, NOTAS_HEADER)
 
-    if page == "AlunoHome":
-        current_user = st.session_state.get("current_user", "")
-        st.title("Área do Aluno")
-        st.write(f"Olá, **{current_user}**!")
+        username = st.session_state.current_user
+        user = users[users.name == username]
+        if user.empty:
+            st.error('Usuário não encontrado.')
+            return
 
-        df_alunos = pd.read_csv(ALUNOS_CSV, dtype=str, keep_default_na=False)
-        df_alunos = df_alunos.astype(str).apply(lambda c: c.str.strip())
-        aluno_row = df_alunos[df_alunos["matricula"] == current_user]
-        if not aluno_row.empty:
-            nome  = aluno_row.iloc[0]["nome"]
-            turma = aluno_row.iloc[0]["turma"]
-            st.subheader(f"Nome: {nome}")
+        user_id = user.iloc[0]['id']
+        full_name = user.iloc[0]['name']
+
+        st.title('Área do Aluno')
+        st.write(f"Olá, **{full_name}**!")
+        st.write('---')
+
+        aluno = alunos[alunos.matricula == user_id]
+        if not aluno.empty:
+            turma = aluno.iloc[0]['turma']
             st.subheader(f"Turma: {turma}")
         else:
-            st.info("Dados do aluno não encontrados.")
+            st.info('Dados de matrícula não encontrados.')
 
-        st.write("---")
-        st.subheader("Minhas Disciplinas e Notas")
+        st.write('---')
+        st.subheader('Minhas Disciplinas e Notas')
 
-        df_notas = pd.read_csv(NOTAS_CSV, dtype=str, keep_default_na=False)
-        df_notas = df_notas.astype(str).apply(lambda c: c.str.strip())
-        df_meu  = df_notas[df_notas["matricula"] == current_user]
-
-        if not df_meu.empty:
-            df_meu = df_meu.merge(
-                pd.read_csv(DISCIPLINAS_CSV, dtype=str, keep_default_na=False)
-                .astype(str).apply(lambda c: c.str.strip()),
-                on="disciplina", how="left"
+        minhas = notas[notas.matricula == user_id]
+        if not minhas.empty:
+            df = minhas[['nome_disciplina','nota']].rename(
+                columns={'nome_disciplina':'Disciplina','nota':'Nota'}
             )
-            st.dataframe(df_meu[["disciplina", "nota"]].rename(columns={
-                "disciplina": "Disciplina",
-                "nota": "Nota"
-            }))
+            st.dataframe(df, use_container_width=True)
         else:
-            st.info("Nenhuma nota registrada.")
-        st.write("---")
-        st.caption("Sistema de Gerenciamento de Notas Escolares  •  Versão Acadêmica")
+            st.info('Nenhuma nota registrada.')
 
-    elif page == "InfoPage":
+        st.write('---')
+        st.caption('Sistema de Gerenciamento de Notas Escolares  •  Versão Acadêmica')
+
+    elif st.session_state.current_page == 'InfoPage':
         show_info()

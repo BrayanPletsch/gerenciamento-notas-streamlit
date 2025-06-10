@@ -1,81 +1,75 @@
+from pathlib import Path
 import time
-import streamlit as st
+
 import pandas as pd
-import os
+import streamlit as st
 
-CSV_DIR   = "data"
-CSV_PATH  = os.path.join(CSV_DIR, "disciplinas.csv")
 
-def _ensure_disciplinas_csv():
-    os.makedirs(CSV_DIR, exist_ok=True)
-    header = ["codigo", "nome_disciplina"]
-    if (not os.path.exists(CSV_PATH)) or (os.path.getsize(CSV_PATH) == 0):
-        pd.DataFrame(columns=header).to_csv(CSV_PATH, index=False)
-        return
-    try:
-        df0 = pd.read_csv(CSV_PATH, nrows=0)
-        if set(df0.columns) != set(header):
-            raise ValueError
-    except Exception:
-        pd.DataFrame(columns=header).to_csv(CSV_PATH, index=False)
+DATA_DIR = Path('data')
+DISCIPLINAS_CSV = DATA_DIR / 'disciplinas.csv'
+HEADER = ['codigo','nome_disciplina']
+
+
+def ensure_csv():
+    DATA_DIR.mkdir(exist_ok=True)
+    if not DISCIPLINAS_CSV.exists() or DISCIPLINAS_CSV.stat().st_size == 0:
+        pd.DataFrame(columns=HEADER).to_csv(DISCIPLINAS_CSV,index=False)
+    else:
+        cols = pd.read_csv(DISCIPLINAS_CSV,nrows=0).columns.tolist()
+        if set(cols)!=set(HEADER):
+            pd.DataFrame(columns=HEADER).to_csv(DISCIPLINAS_CSV,index=False)
+
+
+def load_disciplinas():
+    ensure_csv()
+    df = pd.read_csv(DISCIPLINAS_CSV,dtype=str,keep_default_na=False)
+    return df.map(lambda x: x.strip())
+
+
+def save_disciplinas(df: pd.DataFrame):
+    df.to_csv(DISCIPLINAS_CSV,index=False)
+
 
 def show_disciplina_management():
-    _ensure_disciplinas_csv()
+    df = load_disciplinas()
 
-    df = pd.read_csv(CSV_PATH, dtype=str, keep_default_na=False)
-    df = df.astype(str).apply(lambda col: col.str.strip())
+    if st.button('🔙 Voltar'):
+        st.session_state.current_page = 'ProfessorHome'
+        st.rerun()
 
-    col1, col2 = st.columns([3,1])
-    
-    if "ProfessorHome" not in st.session_state:
-        st.session_state.current_page = "ProfessorHome"
-
-    with col2:
-        if st.button("🔙 Voltar"):
-            st.session_state.page = "ProfessorHome"
-    
-    st.title("Gerenciar Disciplinas")
-    st.subheader("📚 Lista de Disciplinas")
+    st.title('📚 Gerenciar Disciplinas')
+    st.subheader('Lista de Disciplinas')
     st.dataframe(df)
 
-    with st.expander("Adicionar Disciplina"):
-        with st.form(key="add_disciplina", clear_on_submit=True):
-            codigo         = st.text_input("Código da Disciplina")
-            nome_disciplina = st.text_input("Nome da Disciplina")
-            if st.form_submit_button("Adicionar"):
-                cod_str  = codigo.strip()
-                nome_str = nome_disciplina.strip()
-                if (not cod_str) or (not nome_str):
-                    st.error("Preencha todos os campos")
+    with st.expander('Adicionar Disciplina'):
+        with st.form('add_disciplina',clear_on_submit=True):
+            codigo = st.text_input('Código').strip()
+            nome = st.text_input('Disciplina').strip()
+            if st.form_submit_button('Adicionar'):
+                if not codigo or not nome:
+                    st.error('Preencha todos os campos')
+                elif codigo in df['codigo'].tolist():
+                    st.error('Código já cadastrado')
                 else:
-                    df_atual = pd.read_csv(CSV_PATH, dtype=str, keep_default_na=False)
-                    df_atual = df_atual.astype(str).apply(lambda col: col.str.strip())
-                    if cod_str in df_atual["codigo"].values:
-                        st.error("Código já cadastrado")
-                    else:
-                        new_row = pd.DataFrame([{
-                            "codigo": cod_str,
-                            "nome_disciplina": nome_str
-                        }])
-                        df_concat = pd.concat([df_atual, new_row], ignore_index=True)
-                        df_concat.to_csv(CSV_PATH, index=False)
-                        st.success("Disciplina adicionada com sucesso")
-                        st.rerun()
+                    row = pd.DataFrame([{'codigo':codigo,'nome_disciplina':nome}])
+                    updated = pd.concat([df,row],ignore_index=True)
+                    save_disciplinas(updated)
+                    st.success('Disciplina adicionada com sucesso')
+                    time.sleep(1.5)
+                    st.rerun()
 
-    with st.expander("Remover Disciplina"):
-        with st.form(key="remove_disciplina", clear_on_submit=True):
-            options   = df["codigo"] + " - " + df["nome_disciplina"]
-            to_remove = st.selectbox("Selecione a disciplina", options)
-            confirm_removal = st.selectbox("Tem certeza que deseja remover esta disciplina?", ["Não", "Sim"])
-            if st.form_submit_button("Remover"):
-                if confirm_removal == "Sim":
-                    cod = to_remove.split(" - ")[0]
-                    df_atual = pd.read_csv(CSV_PATH, dtype=str, keep_default_na=False)
-                    df_atual = df_atual.astype(str).apply(lambda col: col.str.strip())
-                    df2 = df_atual[df_atual["codigo"] != cod]
-                    df2.to_csv(CSV_PATH, index=False)
-                    st.success("Disciplina removida com sucesso")
-                    time.sleep(2)
+    with st.expander('Remover Disciplina'):
+        with st.form('remove_disciplina',clear_on_submit=True):
+            options = df['codigo'] + ' – ' + df['nome_disciplina']
+            sel = st.selectbox('Selecione',options.tolist())
+            confirm = st.checkbox('Confirmar remoção')
+            if st.form_submit_button('Remover'):
+                if confirm:
+                    code = sel.split(' – ')[0]
+                    df2 = df[df['codigo']!=code]
+                    save_disciplinas(df2)
+                    st.success('Disciplina removida com sucesso')
+                    time.sleep(1.5)
                     st.rerun()
                 else:
-                    st.info("Ação de remoção cancelada.")
+                    st.warning('Para confirmar a remoção, marque a caixa de seleção.')

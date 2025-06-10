@@ -1,22 +1,16 @@
-# src/utils/Homepage.py
-
 import streamlit as st
+
 from src.pages.professor_pages.ProfessorHome import show_professor_home
-from src.pages.aluno_pages.AlunoHome import show_aluno_home  # implemente quando pronto
+from src.pages.aluno_pages.AlunoHome import show_aluno_home
 
 def show_homepage():
-    """
-    Redireciona para a página do professor ou aluno, com base em st.session_state.user_type.
-    """
     user_type = st.session_state.get("user_type", None)
 
     if user_type == "professor":
         show_professor_home()
     elif user_type == "aluno":
-        show_aluno_home()  # Descomente quando implementar
-        # st.warning("Página do aluno ainda não implementada.")
+        show_aluno_home()
     else:
-        # Perfil inválido: limpa tudo e retorna ao login
         st.warning("Usuário sem perfil válido. Faça login novamente.")
         st.session_state.logged_in = False
         st.session_state.user_type = None

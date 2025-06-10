@@ -1,84 +1,86 @@
+from pathlib import Path
 import time
-import streamlit as st
+
 import pandas as pd
-import os
+import streamlit as st
 
 
-CSV_DIR = "data"
-ALUNOS_CSV_PATH = os.path.join(CSV_DIR, "alunos.csv")
-TURMAS_CSV_PATH = os.path.join(CSV_DIR, "turmas.csv")
+DATA_DIR = Path('data')
+alunos_csv = DATA_DIR / 'alunos.csv'
+
+CSV_HEADER = ['user_id','matricula','nome','turma']
 
 
-def _ensure_csv_files():
-    os.makedirs(CSV_DIR, exist_ok=True)
-    alunos_header = ["matricula", "nome", "turma"]
-    turmas_header = ["turma"]
-    
-    if not os.path.exists(ALUNOS_CSV_PATH) or os.path.getsize(ALUNOS_CSV_PATH) == 0:
-        pd.DataFrame(columns=alunos_header).to_csv(ALUNOS_CSV_PATH, index=False)
-    
-    if not os.path.exists(TURMAS_CSV_PATH) or os.path.getsize(TURMAS_CSV_PATH) == 0:
-        pd.DataFrame(columns=turmas_header).to_csv(TURMAS_CSV_PATH, index=False)
+def ensure_csv():
+    DATA_DIR.mkdir(exist_ok=True)
+    if not alunos_csv.exists() or alunos_csv.stat().st_size == 0:
+        pd.DataFrame(columns=CSV_HEADER).to_csv(alunos_csv,index=False)
+
+
+def load_alunos():
+    ensure_csv()
+    df = pd.read_csv(alunos_csv, dtype=str, keep_default_na=False)
+    return df.map(lambda x: x.strip())
+
+
+def save_alunos(df):
+    df.to_csv(alunos_csv,index=False)
 
 
 def show_aluno_management():
-    _ensure_csv_files()
+    df = load_alunos()
 
-    alunos_df = pd.read_csv(ALUNOS_CSV_PATH, dtype=str, keep_default_na=False)
-    alunos_df = alunos_df.apply(lambda col: col.str.strip())
-    turmas_df = pd.read_csv(TURMAS_CSV_PATH, dtype=str, keep_default_na=False)
-    turmas_df = turmas_df.apply(lambda col: col.str.strip())
+    if st.button('🔙 Voltar'):
+        st.session_state.current_page = 'ProfessorHome'
+        st.rerun()
 
-    col1, col2 = st.columns([3,1])
-    
-    if "ProfessorHome" not in st.session_state:
-        st.session_state.current_page = "ProfessorHome"
+    st.title('👥 Gerenciar Alunos')
+    st.subheader('Lista de Alunos')
+    st.dataframe(df)
 
-    with col2:
-        if st.button("🔙 Voltar"):
-            st.session_state.page = "ProfessorHome"
+    with st.expander('Adicionar Aluno'):
+        with st.form('add_aluno',clear_on_submit=True):
+            nome = st.text_input('Nome Completo').strip()
+            matricula = st.text_input('Matrícula').strip()
 
-    st.title("Gerenciar Alunos")
-    st.subheader("👥 Lista de Alunos")
-    st.dataframe(alunos_df)
+            if df.empty:
+                next_id = 1
+            else:
+                nums = pd.to_numeric(df.user_id,errors='coerce').fillna(0).astype(int)
+                next_id = nums.max() + 1
+            user_id = str(next_id).zfill(3)
+            st.text_input('User ID (autogerado)',value=user_id,disabled=True)
 
-
-    with st.expander("Adicionar Aluno"):
-        with st.form(key="add_aluno", clear_on_submit=True):
-            matricula = st.number_input("Matrícula do Aluno", min_value=1, step=1)
-            nome = st.text_input("Nome Completo")
-            turmas = turmas_df["turma"].dropna().unique().tolist()
-            turma = st.selectbox("Turma", options=["Selecione..."] + turmas)
-            if st.form_submit_button("Adicionar"):
-                mat_str = str(int(matricula))
-                if not nome.strip() or turma == "Selecione...":
-                    st.error("Preencha todos os campos")
+            if st.form_submit_button('Adicionar'):
+                if not nome or not matricula:
+                    st.error('Preencha todos os campos.')
+                elif matricula in df.matricula.tolist():
+                    st.error('Matrícula já existe.')
                 else:
-                    if mat_str in alunos_df["matricula"].values:
-                        st.error("Matrícula já cadastrada")
-                    else:
-                        new_row = pd.DataFrame([{
-                            "matricula": mat_str,
-                            "nome": nome.strip(),
-                            "turma": turma
-                        }])
-                        alunos_df = pd.concat([alunos_df, new_row], ignore_index=True)
-                        alunos_df.to_csv(ALUNOS_CSV_PATH, index=False)
-                        st.success("Aluno adicionado com sucesso")
-                        st.rerun()
+                    new_row = pd.DataFrame([{
+                        'user_id': user_id,
+                        'matricula': matricula,
+                        'nome': nome,
+                        'turma': df.turma.iloc[0] if not df.turma.empty else ''
+                    }])
+                    df_new = pd.concat([df,new_row],ignore_index=True)
+                    save_alunos(df_new)
+                    st.success(f'Aluno {nome} ({user_id}) adicionado.')
+                    time.sleep(1.5)
+                    st.rerun()
 
-    with st.expander("Remover Aluno"):
-        with st.form(key="remove_aluno", clear_on_submit=True):
-            options = alunos_df["matricula"] + " - " + alunos_df["nome"]
-            to_remove = st.selectbox("Selecione o aluno", options)
-            confirm_removal = st.selectbox("Tem certeza que deseja remover este aluno?", ["Não", "Sim"])
-            if st.form_submit_button("Remover"):
-                if confirm_removal == "Sim":
-                    mat = to_remove.split(" - ")[0]
-                    alunos_df = alunos_df[alunos_df["matricula"] != mat]
-                    alunos_df.to_csv(ALUNOS_CSV_PATH, index=False)
-                    st.success(f"Aluno {to_remove} removido com sucesso")
-                    time.sleep(2)
+    with st.expander('Remover Aluno'):
+        with st.form('remove_aluno',clear_on_submit=True):
+            opts = df.user_id + ' - ' + df.nome
+            sel = st.selectbox('Selecione o aluno',opts.tolist())
+            confirm = st.checkbox('Confirmar remoção')
+            if st.form_submit_button('Remover'):
+                if confirm:
+                    uid = sel.split(' - ')[0]
+                    df2 = df[df.user_id != uid]
+                    save_alunos(df2)
+                    st.success(f'Aluno {sel} removido.')
+                    time.sleep(1.5)
                     st.rerun()
                 else:
-                    st.info("Ação de remoção cancelada.")
+                    st.warning('Para confirmar a remoção, marque a caixa de seleção.')

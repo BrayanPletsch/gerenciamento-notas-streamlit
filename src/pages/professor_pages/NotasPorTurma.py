@@ -1,98 +1,106 @@
-import streamlit as st
+from pathlib import Path
+import time
+
 import pandas as pd
-import os
+import streamlit as st
 
-CSV_DIR = "data"
-ALUNOS_CSV_PATH = os.path.join(CSV_DIR, "alunos.csv")
-TURMAS_CSV_PATH = os.path.join(CSV_DIR, "turmas.csv")
-DISCIPLINAS_CSV_PATH = os.path.join(CSV_DIR, "disciplinas.csv")
-NOTAS_CSV_PATH = os.path.join(CSV_DIR, "notas.csv")
 
-def _ensure_notas_csv():
-    os.makedirs(CSV_DIR, exist_ok=True)
-    header = ["nome", "turma", "disciplina", "nota"]
-    if not os.path.exists(NOTAS_CSV_PATH) or os.path.getsize(NOTAS_CSV_PATH) == 0:
-        pd.DataFrame(columns=header).to_csv(NOTAS_CSV_PATH, index=False)
+DATA_DIR = Path('data')
+NOTAS_CSV = DATA_DIR / 'notas.csv'
+NOTAS_HEADER = ['id','matricula','nome','turma','codigo','nome_disciplina','nota']
+
+
+def ensure_notas_csv():
+    DATA_DIR.mkdir(exist_ok=True)
+    if not NOTAS_CSV.exists() or NOTAS_CSV.stat().st_size == 0:
+        pd.DataFrame(columns=NOTAS_HEADER).to_csv(NOTAS_CSV, index=False)
+    else:
+        cols = pd.read_csv(NOTAS_CSV, nrows=0).columns.tolist()
+        if set(cols) != set(NOTAS_HEADER):
+            pd.DataFrame(columns=NOTAS_HEADER).to_csv(NOTAS_CSV, index=False)
+
+
+def load_notas():
+    ensure_notas_csv()
+    df = pd.read_csv(NOTAS_CSV, dtype=str, keep_default_na=False)
+    return df.map(lambda x: x.strip())
+
+
+def save_notas(df):
+    df.to_csv(NOTAS_CSV, index=False)
+
 
 def show_notas_por_turma():
-    _ensure_notas_csv()
+    notas = load_notas()
 
-    alunos_df = pd.read_csv(ALUNOS_CSV_PATH, dtype=str, keep_default_na=False)
-    turmas_df = pd.read_csv(TURMAS_CSV_PATH, dtype=str, keep_default_na=False)
-    disciplinas_df = pd.read_csv(DISCIPLINAS_CSV_PATH, dtype=str, keep_default_na=False)
+    if st.button('🔙 Voltar'):
+        st.session_state.current_page = 'ProfessorHome'
+        st.rerun()
 
-    alunos_df = alunos_df.apply(lambda col: col.str.strip())
-    turmas_df = turmas_df.apply(lambda col: col.str.strip())
-    disciplinas_df = disciplinas_df.apply(lambda col: col.str.strip())
+    st.title('📝 Notas por Turma')
+    st.subheader('Lista de Notas')
+    st.dataframe(notas)
 
-    turmas = turmas_df["turma"].dropna().unique().tolist()
-    disciplinas = disciplinas_df["nome_disciplina"].dropna().unique().tolist()
+    with st.expander('Adicionar / Atualizar Nota'):
+        with st.form('form_nota', clear_on_submit=True):
+            turmas = notas['turma'].dropna().unique().tolist()
+            alunos = notas.apply(lambda r: f'{r.matricula} – {r.nome}', axis=1).unique().tolist()
+            disciplinas = notas.apply(lambda r: f'{r.codigo} – {r.nome_disciplina}', axis=1).unique().tolist()
 
-    st.title("Notas por Turma")
-    st.subheader("📝 Lista de Notas")
+            turma_sel = st.selectbox('Turma', ['Selecione...'] + turmas)
+            aluno_sel = st.selectbox('Aluno', ['Selecione...'] + alunos)
+            disc_sel = st.selectbox('Disciplina', ['Selecione...'] + disciplinas)
+            nota_in = st.text_input('Nota').strip()
 
-    notas_df = pd.read_csv(NOTAS_CSV_PATH, dtype=str, keep_default_na=False)
-    notas_df = notas_df.apply(lambda col: col.str.strip())
-    st.dataframe(notas_df)
-
-    with st.expander("Adicionar/Atualizar Nota"):
-        with st.form(key="add_nota", clear_on_submit=True):
-            turma_selecionada = st.selectbox("Selecione a Turma", options=["Selecione..."] + turmas)
-            nome_aluno = st.selectbox("Selecione o Aluno", options=["Selecione..."] + alunos_df["nome"].dropna().unique().tolist())
-            disciplina_selecionada = st.selectbox("Selecione a Disciplina", options=["Selecione..."] + disciplinas)
-            nota_input = st.text_input("Nota")
-
-            if st.form_submit_button("Salvar"):
-                if (
-                    turma_selecionada == "Selecione..." or
-                    nome_aluno == "Selecione..." or
-                    disciplina_selecionada == "Selecione..." or
-                    not nota_input.strip()
-                ):
-                    st.error("Preencha todos os campos corretamente")
+            if st.form_submit_button('Salvar'):
+                if turma_sel == 'Selecione...' or aluno_sel == 'Selecione...' or disc_sel == 'Selecione...' or not nota_in:
+                    st.error('Preencha todos os campos')
                 else:
-                    df_atual = pd.read_csv(NOTAS_CSV_PATH, dtype=str, keep_default_na=False)
-                    df_atual = df_atual.apply(lambda col: col.str.strip())
+                    matricula = aluno_sel.split(' – ')[0]
+                    codigo = disc_sel.split(' – ')[0]
+                    nome = aluno_sel.split(' – ')[1]
+                    turma = turma_sel
+                    nome_disc = disc_sel.split(' – ')[1]
 
-                    mask = (
-                        (df_atual["nome"] == nome_aluno) &
-                        (df_atual["turma"] == turma_selecionada) &
-                        (df_atual["disciplina"] == disciplina_selecionada)
+                    next_id = (
+                        str(int(notas.id.astype(int).max()) + 1).zfill(3)
+                        if not notas.empty else '001'
                     )
 
+                    mask = (notas['matricula'] == matricula) & (notas['codigo'] == codigo)
                     if mask.any():
-                        df_atual.loc[mask, "nota"] = nota_input.strip()
+                        notas.loc[mask, 'nota'] = nota_in
                     else:
-                        new_row = pd.DataFrame([{
-                            "nome": nome_aluno,
-                            "turma": turma_selecionada,
-                            "disciplina": disciplina_selecionada,
-                            "nota": nota_input.strip()
+                        new = pd.DataFrame([{
+                            'id': next_id,
+                            'matricula': matricula,
+                            'nome': nome,
+                            'turma': turma,
+                            'codigo': codigo,
+                            'nome_disciplina': nome_disc,
+                            'nota': nota_in
                         }])
-                        df_atual = pd.concat([df_atual, new_row], ignore_index=True)
+                        notas = pd.concat([notas, new], ignore_index=True)
 
-                    df_atual.to_csv(NOTAS_CSV_PATH, index=False)
-                    st.success("Nota salva com sucesso")
+                    save_notas(notas)
+                    st.success('Nota salva com sucesso')
+                    time.sleep(1.5)
                     st.rerun()
 
-    with st.expander("Remover Nota"):
-        with st.form(key="remove_nota", clear_on_submit=True):
-            options_remover = notas_df["nome"] + " | " + notas_df["turma"] + " | " + notas_df["disciplina"]
-            to_remove = st.selectbox("Selecione a nota para remover", options_remover.tolist())
-
-            if st.form_submit_button("Remover"):
-                parts = to_remove.split(" | ")
-                nome = parts[0]
-                turma_sel = parts[1]
-                disc = parts[2]
-
-                df_atual = pd.read_csv(NOTAS_CSV_PATH, dtype=str, keep_default_na=False)
-                df_atual = df_atual.apply(lambda col: col.str.strip())
-                df2 = df_atual[~(
-                    (df_atual["nome"] == nome) &
-                    (df_atual["turma"] == turma_sel) &
-                    (df_atual["disciplina"] == disc)
-                )]
-                df2.to_csv(NOTAS_CSV_PATH, index=False)
-                st.success("Nota removida com sucesso")
-                st.rerun()
+    with st.expander('Remover Nota'):
+        with st.form('form_remove', clear_on_submit=True):
+            opts = notas.apply(lambda r: f'{r.id} – {r.matricula} – {r.nome_disciplina}', axis=1).tolist()
+            sel = st.selectbox('Selecione nota', ['Selecione...'] + opts)
+            confirm = st.checkbox('Confirmar remoção')
+            if st.form_submit_button('Remover'):
+                if sel == 'Selecione...':
+                    st.info('Selecione uma nota válida')
+                elif not confirm:
+                    st.warning('Para confirmar a remoção, marque a caixa de seleção.')
+                else:
+                    note_id = sel.split(' – ')[0]
+                    notas = notas[notas.id != note_id]
+                    save_notas(notas)
+                    st.success('Nota removida com sucesso')
+                    time.sleep(1.5)
+                    st.rerun()
