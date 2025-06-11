@@ -28,6 +28,8 @@ def show_professor_home():
         st.session_state.current_page = "InfoPage"
     st.sidebar.divider()
     if st.sidebar.button("Sair", use_container_width=True):
+        st.session_state.clear()
+        st.cache_data.clear()
         logout()
 
     page = st.session_state.current_page

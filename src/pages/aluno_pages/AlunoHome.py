@@ -44,6 +44,8 @@ def show_aluno_home():
         st.session_state.current_page = 'InfoPage'
     st.sidebar.divider()
     if st.sidebar.button('Sair', use_container_width=True):
+        st.session_state.clear()
+        st.cache_data.clear()
         logout()
 
     if st.session_state.current_page == 'AlunoHome':
@@ -58,7 +60,7 @@ def show_aluno_home():
             st.error('Usuário não encontrado.')
             return
 
-        user_id   = user_row.iloc[0]['id']
+        user_id = user_row.iloc[0]['id']
         full_name = user_row.iloc[0]['name']
 
         st.title('Área do Aluno')
@@ -66,8 +68,13 @@ def show_aluno_home():
         st.write('---')
 
         aluno_row = alunos[alunos.matricula == user_id]
+        professor_row = users[users.id == '001']
         if not aluno_row.empty:
-            st.subheader(f"Turma: {aluno_row.iloc[0]['turma']}")
+            st.markdown(f"""
+                        <h3>Professor(a) de Estrutura de Dados I: <strong style="color:#2D9FE5">{professor_row.iloc[0]['name']}</strong></h3>
+                        <h3>Matrícula: <strong style="color:#2D9FE5">{aluno_row.iloc[0]['matricula']}</strong></h3>
+                        <h3>Turma: <strong style="color:#2D9FE5">{aluno_row.iloc[0]['turma']}</strong></h3>
+                """, unsafe_allow_html=True)
         else:
             st.info('Dados de matrícula não encontrados.')
 
