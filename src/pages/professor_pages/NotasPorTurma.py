@@ -38,13 +38,13 @@ def show_notas_por_turma():
     df_notas = load_notas()
     df_alunos = pd.read_csv(ALUNOS_CSV, dtype=str, keep_default_na=False).apply(lambda c: c.str.strip())
     df_turmas = pd.read_csv(TURMAS_CSV, dtype=str, keep_default_na=False).apply(lambda c: c.str.strip())
-    df_disc   = pd.read_csv(DISCIPLINAS_CSV, dtype=str, keep_default_na=False).apply(lambda c: c.str.strip())
+    df_disc = pd.read_csv(DISCIPLINAS_CSV, dtype=str, keep_default_na=False).apply(lambda c: c.str.strip())
 
     if st.button('🔙 Voltar'):
         st.session_state.current_page = 'ProfessorHome'
         st.rerun()
 
-    st.title('Notas por Turma')
+    st.title('📝 Notas por Turma')
     st.subheader('Lista de Notas')
 
     disp = (
@@ -58,21 +58,21 @@ def show_notas_por_turma():
         with st.form('form_nota', clear_on_submit=True):
             turma_opts = df_turmas['turma'].tolist()
             aluno_opts = df_alunos.apply(lambda r: f"{r.matricula} – {r.nome}", axis=1).tolist()
-            disc_opts  = df_disc.apply(lambda r: f"{r.codigo} – {r.nome_disciplina}", axis=1).tolist()
+            disc_opts = df_disc.apply(lambda r: f"{r.codigo} – {r.nome_disciplina}", axis=1).tolist()
 
             turma_sel = st.selectbox('Turma', ['Selecione...'] + turma_opts)
             aluno_sel = st.selectbox('Aluno', ['Selecione...'] + aluno_opts)
-            disc_sel  = st.selectbox('Disciplina', ['Selecione...'] + disc_opts)
-            nota_in   = st.text_input('Nota').strip()
+            disc_sel = st.selectbox('Disciplina', ['Selecione...'] + disc_opts)
+            nota_in = st.text_input('Nota').strip()
 
             if st.form_submit_button('Salvar'):
                 if turma_sel == 'Selecione...' or aluno_sel == 'Selecione...' or disc_sel == 'Selecione...' or not nota_in:
                     st.error('Preencha todos os campos')
                 else:
                     matricula = aluno_sel.split(' – ')[0]
-                    codigo    = disc_sel.split(' – ')[0]
-                    next_id   = df_notas['id'].astype(int).max() + 1 if not df_notas.empty else 1
-                    next_id   = str(next_id).zfill(3)
+                    codigo = disc_sel.split(' – ')[0]
+                    next_id = df_notas['id'].astype(int).max() + 1 if not df_notas.empty else 1
+                    next_id = str(next_id).zfill(3)
 
                     mask = (df_notas['matricula'] == matricula) & (df_notas['codigo'] == codigo)
                     if mask.any():
